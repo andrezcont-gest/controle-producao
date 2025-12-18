@@ -158,12 +158,13 @@ if not df_gantt.empty:
             df_os = df_gantt[df_gantt['OS'] == os_num]
             
             # Título da OS (sem barra, apenas label)
-            y_labels.append(f"OS {os_num}")
+            y_labels.append(f"<b>OS {os_num}</b>")
             y_position += 1
             
             # Atividades da OS
             for idx, row in df_os.iterrows():
-                label = f"  {row['PROGRAMAÇÃO | PROG. DETALHADA'][:40]}"
+                # MELHORIA 3: Adicionar nome da área na label
+                label = f"  {row['PROGRAMAÇÃO | PROG. DETALHADA'][:35]} | {row['PROG.']}"
                 y_labels.append(label)
                 
                 cor = color_map.get(row['PROG.'], '#808080')
@@ -175,18 +176,17 @@ if not df_gantt.empty:
                     dias_completos = duracao_total * (row['% CONCLUÍDO'] / 100)
                     dt_parcial = row['DT INICIO'] + pd.Timedelta(days=dias_completos)
                     
-                    fig.add_trace(go.Bar(
-                        x=[dt_parcial],
-                        y=[y_position],
-                        base=[row['DT INICIO']],
-                        orientation='h',
-                        marker=dict(color=cor, line=dict(width=0)),
-                        width=0.6,
+                    # MELHORIA 2: Barra vai da DT INICIO até dt_parcial (só o período real)
+                    fig.add_trace(go.Scatter(
+                        x=[row['DT INICIO'], dt_parcial],
+                        y=[y_position, y_position],
+                        mode='lines',
+                        line=dict(color=cor, width=20),
                         showlegend=False,
                         hovertemplate=(
                             f"<b>{row['PROGRAMAÇÃO | PROG. DETALHADA'][:50]}</b><br>" +
                             f"OS: {row['OS']}<br>" +
-                            f"Área: {row['PROG.']}<br>" +
+                            f"Área: <b>{row['PROG.']}</b><br>" +
                             f"Início: {row['DT INICIO'].strftime('%d/%m/%Y')}<br>" +
                             f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<br>" +
                             f"Concluído: {row['% CONCLUÍDO']:.0f}%<extra></extra>"
@@ -195,30 +195,27 @@ if not df_gantt.empty:
                     
                     # Parte restante (mais clara)
                     if row['% CONCLUÍDO'] < 100:
-                        fig.add_trace(go.Bar(
-                            x=[row['DT FIM']],
-                            y=[y_position],
-                            base=[dt_parcial],
-                            orientation='h',
-                            marker=dict(color=cor, opacity=0.3, line=dict(width=0)),
-                            width=0.6,
+                        fig.add_trace(go.Scatter(
+                            x=[dt_parcial, row['DT FIM']],
+                            y=[y_position, y_position],
+                            mode='lines',
+                            line=dict(color=cor, width=20, dash='dot'),
+                            opacity=0.4,
                             showlegend=False,
                             hovertemplate=f"Restante: {100-row['% CONCLUÍDO']:.0f}%<extra></extra>"
                         ))
                 else:
-                    # Barra simples
-                    fig.add_trace(go.Bar(
-                        x=[row['DT FIM']],
-                        y=[y_position],
-                        base=[row['DT INICIO']],
-                        orientation='h',
-                        marker=dict(color=cor, line=dict(width=0)),
-                        width=0.6,
+                    # MELHORIA 2: Barra simples vai de DT INICIO até DT FIM (só o período real)
+                    fig.add_trace(go.Scatter(
+                        x=[row['DT INICIO'], row['DT FIM']],
+                        y=[y_position, y_position],
+                        mode='lines',
+                        line=dict(color=cor, width=20),
                         showlegend=False,
                         hovertemplate=(
                             f"<b>{row['PROGRAMAÇÃO | PROG. DETALHADA'][:50]}</b><br>" +
                             f"OS: {row['OS']}<br>" +
-                            f"Área: {row['PROG.']}<br>" +
+                            f"Área: <b>{row['PROG.']}</b><br>" +
                             f"Início: {row['DT INICIO'].strftime('%d/%m/%Y')}<br>" +
                             f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<extra></extra>"
                         )
@@ -227,27 +224,30 @@ if not df_gantt.empty:
                 y_position += 1
     else:
         # Agrupado por Área
-        for area in df_gantt['PROG.'].unique():
+        for area in sorted(df_gantt['PROG.'].unique()):
             df_area = df_gantt[df_gantt['PROG.'] == area]
             
+            # Título da área
+            y_labels.append(f"<b>{area}</b>")
+            y_position += 1
+            
             for idx, row in df_area.iterrows():
-                label = f"{row['PROG.']} - OS {row['OS']}"
+                label = f"  OS {row['OS']} - {row['PROGRAMAÇÃO | PROG. DETALHADA'][:35]}"
                 y_labels.append(label)
                 
                 cor = color_map.get(row['PROG.'], '#808080')
                 
-                fig.add_trace(go.Bar(
-                    x=[row['DT FIM']],
-                    y=[y_position],
-                    base=[row['DT INICIO']],
-                    orientation='h',
-                    marker=dict(color=cor, line=dict(width=0)),
-                    width=0.6,
+                # MELHORIA 2: Barra vai só do início ao fim real
+                fig.add_trace(go.Scatter(
+                    x=[row['DT INICIO'], row['DT FIM']],
+                    y=[y_position, y_position],
+                    mode='lines',
+                    line=dict(color=cor, width=20),
                     showlegend=False,
                     hovertemplate=(
                         f"<b>{row['PROGRAMAÇÃO | PROG. DETALHADA'][:50]}</b><br>" +
                         f"OS: {row['OS']}<br>" +
-                        f"Área: {row['PROG.']}<br>" +
+                        f"Área: <b>{row['PROG.']}</b><br>" +
                         f"Início: {row['DT INICIO'].strftime('%d/%m/%Y')}<br>" +
                         f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<extra></extra>"
                     )
@@ -255,7 +255,7 @@ if not df_gantt.empty:
                 
                 y_position += 1
     
-    # Layout estilo Power BI
+    # MELHORIA 1: Layout com datas no TOPO
     fig.update_layout(
         xaxis=dict(
             title="",
@@ -269,7 +269,8 @@ if not df_gantt.empty:
             gridwidth=1,
             showline=True,
             linecolor='rgba(0, 0, 0, 0.2)',
-            tickfont=dict(size=10, color='#666666')
+            tickfont=dict(size=10, color='#666666'),
+            side='top'  # MELHORIA 1: Datas no topo!
         ),
         yaxis=dict(
             title="",
@@ -284,9 +285,8 @@ if not df_gantt.empty:
         ),
         plot_bgcolor='white',
         paper_bgcolor='white',
-        barmode='overlay',
         height=max(500, len(y_labels) * 30),
-        margin=dict(l=300, r=150, t=60, b=60),
+        margin=dict(l=350, r=150, t=80, b=40),  # Mais margem no topo para as datas
         font=dict(color='#333333'),
         hovermode='closest',
         showlegend=False
@@ -305,7 +305,7 @@ if not df_gantt.empty:
     # Anotação HOJE
     fig.add_annotation(
         x=hoje,
-        y=-1,
+        y=-0.8,
         text="HOJE",
         showarrow=False,
         font=dict(size=10, color="black", weight="bold"),
@@ -317,17 +317,38 @@ if not df_gantt.empty:
     
     st.plotly_chart(fig, use_container_width=True)
     
-    # Legenda de cores (estilo Power BI)
-    st.markdown("#### 🎨 Legenda - Áreas (PROG.)")
-    cols_legenda = st.columns(min(len(areas_unicas), 5))
+    # MELHORIA 3: Legenda de cores melhorada (estilo Power BI)
+    st.markdown("---")
+    st.markdown("### 🎨 Legenda - Áreas (PROG.)")
+    
+    # Criar grid de legendas
+    num_colunas = min(len(areas_unicas), 6)
+    cols_legenda = st.columns(num_colunas)
+    
     for i, area in enumerate(areas_unicas):
-        with cols_legenda[i % 5]:
+        with cols_legenda[i % num_colunas]:
             cor = color_map[area]
             qtd = len(df_gantt[df_gantt['PROG.'] == area])
             st.markdown(
-                f'<div style="display:flex; align-items:center; gap:8px;">'
-                f'<div style="width:20px; height:20px; background-color:{cor}; border-radius:3px;"></div>'
-                f'<span style="font-size:12px;">{area} ({qtd})</span>'
+                f'<div style="'
+                f'display:flex; '
+                f'align-items:center; '
+                f'gap:10px; '
+                f'padding:8px; '
+                f'border:1px solid #ddd; '
+                f'border-radius:5px; '
+                f'background-color:#f8f9fa; '
+                f'margin-bottom:8px;">'
+                f'<div style="'
+                f'width:30px; '
+                f'height:20px; '
+                f'background-color:{cor}; '
+                f'border-radius:3px;'
+                f'"></div>'
+                f'<div style="flex:1;">'
+                f'<div style="font-size:13px; font-weight:bold; color:#333;">{area}</div>'
+                f'<div style="font-size:11px; color:#666;">{qtd} atividade(s)</div>'
+                f'</div>'
                 f'</div>',
                 unsafe_allow_html=True
             )
