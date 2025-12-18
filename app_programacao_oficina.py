@@ -215,14 +215,14 @@ if not df_gantt.empty:
                 
                 cor = color_map.get(row['PROG.'], '#808080')
                 
-                # Barra com % concluído
+                # Sempre desenhar a barra
                 if mostrar_concluido and row['% CONCLUÍDO'] > 0:
-                    # Parte concluída
+                    # Tem progresso - mostrar bicolor
                     duracao_total = (row['DT FIM'] - row['DT INICIO']).days
                     dias_completos = duracao_total * (row['% CONCLUÍDO'] / 100)
                     dt_parcial = row['DT INICIO'] + pd.Timedelta(days=dias_completos)
                     
-                    # MELHORIA 2: Barra vai da DT INICIO até dt_parcial (só o período real)
+                    # Parte concluída (sólida)
                     fig.add_trace(go.Scatter(
                         x=[row['DT INICIO'], dt_parcial],
                         y=[y_position, y_position],
@@ -240,7 +240,7 @@ if not df_gantt.empty:
                         )
                     ))
                     
-                    # Parte restante (mais clara)
+                    # Parte restante (pontilhada)
                     if row['% CONCLUÍDO'] < 100:
                         fig.add_trace(go.Scatter(
                             x=[dt_parcial, row['DT FIM']],
@@ -252,7 +252,7 @@ if not df_gantt.empty:
                             hovertemplate=f"Restante: {100-row['% CONCLUÍDO']:.0f}%<extra></extra>"
                         ))
                 else:
-                    # MELHORIA 2: Barra simples vai de DT INICIO até DT FIM (só o período real)
+                    # Sem progresso OU checkbox desmarcado - barra completa sólida
                     fig.add_trace(go.Scatter(
                         x=[row['DT INICIO'], row['DT FIM']],
                         y=[y_position, y_position],
@@ -265,6 +265,7 @@ if not df_gantt.empty:
                             f"Área: <b>{row['PROG.']}</b><br>" +
                             f"Início: {row['DT INICIO'].strftime('%d/%m/%Y')}<br>" +
                             f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<br>" +
+                            f"Concluído: {row['% CONCLUÍDO']:.0f}%<br>" +
                             f"Data Contratual: {data_contratual_str}<extra></extra>"
                         )
                     ))
