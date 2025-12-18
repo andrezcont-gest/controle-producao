@@ -77,8 +77,20 @@ st.sidebar.markdown("---")
 lista_os = sorted(df['OS'].dropna().unique().tolist())
 os_sel = st.sidebar.multiselect("OS", options=lista_os, default=[])
 
+# NOVO: Filtro de WK (Semana)
+lista_wk_raw = df['WK'].dropna().unique().tolist()
+try:
+    lista_wk = sorted([str(x) for x in lista_wk_raw], key=lambda x: int(x) if x.isdigit() else float('inf'))
+except:
+    lista_wk = sorted([str(x) for x in lista_wk_raw])
+wk_sel = st.sidebar.multiselect("Semana (WK)", options=lista_wk, default=[])
+
 lista_areas = sorted(df['PROG.'].dropna().unique().tolist())
 area_sel = st.sidebar.multiselect("Área", options=lista_areas, default=[])
+
+# NOVO: Filtro de Supervisor
+lista_supervisores = sorted(df['SUPERVISÃO '].dropna().unique().tolist())
+supervisor_sel = st.sidebar.multiselect("Supervisor", options=lista_supervisores, default=[])
 
 lista_clientes = sorted(df['CLIENTE'].dropna().unique().tolist())
 cliente_sel = st.sidebar.multiselect("Cliente", options=lista_clientes, default=[])
@@ -87,8 +99,12 @@ cliente_sel = st.sidebar.multiselect("Cliente", options=lista_clientes, default=
 df_filtrado = df.copy()
 if os_sel:
     df_filtrado = df_filtrado[df_filtrado['OS'].isin(os_sel)]
+if wk_sel:
+    df_filtrado = df_filtrado[df_filtrado['WK'].isin(wk_sel)]
 if area_sel:
     df_filtrado = df_filtrado[df_filtrado['PROG.'].isin(area_sel)]
+if supervisor_sel:
+    df_filtrado = df_filtrado[df_filtrado['SUPERVISÃO '].isin(supervisor_sel)]
 if cliente_sel:
     df_filtrado = df_filtrado[df_filtrado['CLIENTE'].isin(cliente_sel)]
 
@@ -157,9 +173,39 @@ if not df_gantt.empty:
         for os_num in df_gantt['OS'].unique():
             df_os = df_gantt[df_gantt['OS'] == os_num]
             
-            # Título da OS (sem barra, apenas label)
-            y_labels.append(f"<b>OS {os_num}</b>")
+            # Pegar data contratual da OS
+            data_contratual = df_os['DATA CONTRATUAL'].iloc[0]
+            data_contratual_str = data_contratual.strftime('%d/%m/%Y') if pd.notna(data_contratual) else 'N/A'
+            
+            # NOVO: Título da OS com data contratual
+            y_labels.append(f"<b>OS {os_num}</b> | 📅 Contratual: {data_contratual_str}")
             y_position += 1
+            
+            # Adicionar marcador visual da data contratual (se houver)
+            if pd.notna(data_contratual):
+                # Adicionar linha vertical na data contratual
+                fig.add_shape(
+                    type="line",
+                    x0=data_contratual,
+                    x1=data_contratual,
+                    y0=y_position - 0.8,
+                    y1=y_position + len(df_os) - 0.2,
+                    line=dict(color="red", width=2, dash="dash"),
+                    opacity=0.5
+                )
+                
+                # Adicionar label "CONTRATUAL"
+                fig.add_annotation(
+                    x=data_contratual,
+                    y=y_position - 1,
+                    text="CONTRATUAL",
+                    showarrow=False,
+                    font=dict(size=9, color="red", weight="bold"),
+                    bgcolor="rgba(255, 255, 255, 0.8)",
+                    bordercolor="red",
+                    borderwidth=1,
+                    borderpad=2
+                )
             
             # Atividades da OS
             for idx, row in df_os.iterrows():
@@ -189,7 +235,8 @@ if not df_gantt.empty:
                             f"Área: <b>{row['PROG.']}</b><br>" +
                             f"Início: {row['DT INICIO'].strftime('%d/%m/%Y')}<br>" +
                             f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<br>" +
-                            f"Concluído: {row['% CONCLUÍDO']:.0f}%<extra></extra>"
+                            f"Concluído: {row['% CONCLUÍDO']:.0f}%<br>" +
+                            f"Data Contratual: {data_contratual_str}<extra></extra>"
                         )
                     ))
                     
@@ -217,7 +264,8 @@ if not df_gantt.empty:
                             f"OS: {row['OS']}<br>" +
                             f"Área: <b>{row['PROG.']}</b><br>" +
                             f"Início: {row['DT INICIO'].strftime('%d/%m/%Y')}<br>" +
-                            f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<extra></extra>"
+                            f"Fim: {row['DT FIM'].strftime('%d/%m/%Y')}<br>" +
+                            f"Data Contratual: {data_contratual_str}<extra></extra>"
                         )
                     ))
                 
