@@ -16,7 +16,7 @@ st.markdown("### Programação semanal")
 st.markdown("---")
 
 # ---------------- UPLOAD ----------------
-uploaded_file = st.sidebar.file_uploader(" Carregue a planilha Excel", type=["xlsx"])
+uploaded_file = st.sidebar.file_uploader("📂 Carregue a planilha Excel", type=["xlsx"])
 
 if uploaded_file is None:
     st.info("Por favor, faça o upload da planilha na barra lateral.")
@@ -117,7 +117,7 @@ col4.metric("Atrasadas", len(df_filtrado[df_filtrado['STATUS'] == 'Atrasado']))
 
 # ---------------- GANTT ESTILO POWER BI ----------------
 st.markdown("---")
-st.subheader(" Cronograma - Visão Gantt (Estilo Power BI)")
+st.subheader("📅 Cronograma - Visão Gantt (Estilo Power BI)")
 
 # Controles
 col_c1, col_c2, col_c3 = st.columns(3)
@@ -132,14 +132,15 @@ with col_c3:
 df_gantt = df_filtrado.dropna(subset=['DT INICIO', 'DT FIM']).copy()
 
 if not df_gantt.empty:
-    # Normalizar nomes das áreas (remover espaços extras e padronizar)
-    df_gantt['PROG.'] = df_gantt['PROG.'].str.strip()
+    # Normalizar nomes das áreas de forma mais agressiva
+    # Remove espaços extras, tabs, múltiplos espaços
+    df_gantt['PROG.'] = df_gantt['PROG.'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
     
     # Paleta de cores por área (similar ao Power BI)
     areas_unicas = sorted(df_gantt['PROG.'].dropna().unique())
     
     # DEBUG: Mostrar áreas encontradas
-    st.info(f"🔍 Debug: {len(areas_unicas)} áreas encontradas: {', '.join(areas_unicas[:10])}")
+    st.info(f"🔍 Debug: {len(areas_unicas)} áreas encontradas: {', '.join(areas_unicas)}")
     
     cores_powerbi = [
         '#4472C4',  # Azul
@@ -157,6 +158,9 @@ if not df_gantt.empty:
         '#9DC3E6',  # Azul muito claro
         '#843C0C',  # Marrom escuro
         '#44546A',  # Cinza azulado
+        '#E7E6E6',  # Cinza muito claro
+        '#8FAADC',  # Azul médio
+        '#F8CBAD',  # Pêssego
     ]
     
     # Criar mapeamento garantindo que todas as áreas tenham uma cor
@@ -165,7 +169,7 @@ if not df_gantt.empty:
         color_map[area] = cores_powerbi[i % len(cores_powerbi)]
     
     # DEBUG: Mostrar mapeamento
-    st.write(" Mapeamento de cores:", color_map)
+    st.write("🎨 Mapeamento de cores:", color_map)
     
     # Ordenar dados
     if agrupar_por_os:
@@ -228,19 +232,33 @@ if not df_gantt.empty:
             # Atividades da OS
             atividades_desenhadas = 0
             for idx, row in df_os.iterrows():
-                # Normalizar área
-                area_norm = str(row['PROG.']).strip()
+                # Normalizar área (mesma lógica do mapeamento)
+                area_norm = str(row['PROG.']).strip().replace(r'\s+', ' ')
+                # Remover regex, fazer manualmente
+                import re
+                area_norm = re.sub(r'\s+', ' ', area_norm.strip())
                 
                 # MELHORIA 3: Adicionar nome da área na label
                 label = f"  {row['PROGRAMAÇÃO | PROG. DETALHADA'][:35]} | {area_norm}"
                 y_labels.append(label)
                 
                 # Garantir que a área tenha uma cor (fallback para cinza se não encontrar)
-                cor = color_map.get(area_norm, '#808080')
+                cor = color_map.get(area_norm, '#FF0000')  # VERMELHO para debug se não encontrar
+                
+                # DEBUG EXTRA: Se não encontrar a cor, avisar
+                if area_norm not in color_map:
+                    st.error(f"❌ Área não encontrada no mapa: '{area_norm}' (len={len(area_norm)})")
+                    st.write(f"Áreas disponíveis: {list(color_map.keys())[:5]}")
                 
                 # DEBUG: Verificar se a data é válida
                 if pd.isna(row['DT INICIO']) or pd.isna(row['DT FIM']):
-                    st.warning(f"⚠️ Atividade sem data: {label}")
+                    st.warning(f"⚠️ Atividade sem data válida: {label}")
+                    y_position += 1
+                    continue
+                
+                # Verificar se está dentro do período de visualização
+                if row['DT FIM'] < data_inicio_view or row['DT INICIO'] > data_fim_view:
+                    # Está fora do período visível
                     y_position += 1
                     continue
                 
@@ -413,7 +431,7 @@ if not df_gantt.empty:
     
     # MELHORIA 3: Legenda de cores melhorada (estilo Power BI)
     st.markdown("---")
-    st.markdown("###  Legenda - Áreas (PROG.)")
+    st.markdown("### 🎨 Legenda - Áreas (PROG.)")
     
     # Criar grid de legendas
     num_colunas = min(len(areas_unicas), 6)
