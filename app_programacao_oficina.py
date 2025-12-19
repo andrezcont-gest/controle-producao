@@ -139,9 +139,6 @@ if not df_gantt.empty:
     # Paleta de cores por área (similar ao Power BI)
     areas_unicas = sorted(df_gantt['PROG.'].dropna().unique())
     
-    # DEBUG: Mostrar áreas encontradas
-    st.info(f"🔍 Debug: {len(areas_unicas)} áreas encontradas: {', '.join(areas_unicas)}")
-    
     cores_powerbi = [
         '#4472C4',  # Azul
         '#ED7D31',  # Laranja
@@ -167,9 +164,6 @@ if not df_gantt.empty:
     color_map = {}
     for i, area in enumerate(areas_unicas):
         color_map[area] = cores_powerbi[i % len(cores_powerbi)]
-    
-    # DEBUG: Mostrar mapeamento
-    st.write("🎨 Mapeamento de cores:", color_map)
     
     # Ordenar dados
     if agrupar_por_os:
@@ -230,35 +224,25 @@ if not df_gantt.empty:
                 )
             
             # Atividades da OS
-            atividades_desenhadas = 0
             for idx, row in df_os.iterrows():
                 # Normalizar área (mesma lógica do mapeamento)
-                area_norm = str(row['PROG.']).strip().replace(r'\s+', ' ')
-                # Remover regex, fazer manualmente
                 import re
-                area_norm = re.sub(r'\s+', ' ', area_norm.strip())
+                area_norm = re.sub(r'\s+', ' ', str(row['PROG.']).strip())
                 
                 # MELHORIA 3: Adicionar nome da área na label
                 label = f"  {row['PROGRAMAÇÃO | PROG. DETALHADA'][:35]} | {area_norm}"
                 y_labels.append(label)
                 
-                # Garantir que a área tenha uma cor (fallback para cinza se não encontrar)
-                cor = color_map.get(area_norm, '#FF0000')  # VERMELHO para debug se não encontrar
+                # Garantir que a área tenha uma cor
+                cor = color_map.get(area_norm, '#808080')
                 
-                # DEBUG EXTRA: Se não encontrar a cor, avisar
-                if area_norm not in color_map:
-                    st.error(f"❌ Área não encontrada no mapa: '{area_norm}' (len={len(area_norm)})")
-                    st.write(f"Áreas disponíveis: {list(color_map.keys())[:5]}")
-                
-                # DEBUG: Verificar se a data é válida
+                # Verificar se a data é válida
                 if pd.isna(row['DT INICIO']) or pd.isna(row['DT FIM']):
-                    st.warning(f"⚠️ Atividade sem data válida: {label}")
                     y_position += 1
                     continue
                 
                 # Verificar se está dentro do período de visualização
                 if row['DT FIM'] < data_inicio_view or row['DT INICIO'] > data_fim_view:
-                    # Está fora do período visível
                     y_position += 1
                     continue
                 
@@ -320,13 +304,8 @@ if not df_gantt.empty:
                             f"Data Contratual: {data_contratual_str}<extra></extra>"
                         )
                     ))
-                    atividades_desenhadas += 1
                 
                 y_position += 1
-            
-            # DEBUG
-            if atividades_desenhadas != len(df_os):
-                st.warning(f"⚠️ OS {os_num}: {atividades_desenhadas}/{len(df_os)} atividades desenhadas")
     else:
         # Agrupado por Área
         for area in sorted(df_gantt['PROG.'].unique()):
