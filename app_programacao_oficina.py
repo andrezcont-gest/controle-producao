@@ -1,5 +1,5 @@
 # =====================================================
-# IMPORTS (OBRIGATÓRIO ESTAR NO TOPO)
+# IMPORTS (SEMPRE NO TOPO)
 # =====================================================
 import streamlit as st
 import pandas as pd
@@ -27,9 +27,6 @@ def normalizar_colunas(df):
         .str.replace(r'\s+', ' ', regex=True)
     )
     return df
-
-def fmt_data(d):
-    return d.strftime('%d/%m/%Y') if pd.notna(d) else 'N/A'
 
 def calcular_percentual(row):
     if pd.notna(row['% CONCLUÍDO_ORIGINAL']):
@@ -158,7 +155,7 @@ c3.metric("Concluídas", (df_filtrado['STATUS'] == 'Concluído').sum())
 c4.metric("Atrasadas", (df_filtrado['STATUS'] == 'Atrasado').sum())
 
 # =====================================================
-# GANTT OTIMIZADO (ALTA PERFORMANCE)
+# GANTT OTIMIZADO (CORES CORRIGIDAS)
 # =====================================================
 st.markdown("---")
 st.subheader("📅 Cronograma - Visão Gantt (Alta Performance)")
@@ -181,20 +178,7 @@ df_gantt['PROG.'] = (
     .str.replace(r'\s+', ' ', regex=True)
 )
 
-df_gantt['DURACAO'] = (
-    (df_gantt['DT FIM'] - df_gantt['DT INICIO'])
-    .dt.days
-    .clip(lower=1)
-)
-
-df_gantt['DUR_CONCLUIDA'] = (
-    df_gantt['DURACAO'] * df_gantt['% CONCLUÍDO'] / 100
-).round()
-
-df_gantt['DUR_RESTANTE'] = (
-    df_gantt['DURACAO'] - df_gantt['DUR_CONCLUIDA']
-).clip(lower=0)
-
+# Label Y
 if agrupar_por_os:
     df_gantt['Y_LABEL'] = (
         "OS " + df_gantt['OS'] + " | " +
@@ -207,6 +191,7 @@ else:
 
 df_gantt = df_gantt.sort_values(['OS', 'DT INICIO'])
 
+# Paleta Power BI
 cores_powerbi = [
     '#4472C4', '#ED7D31', '#A5A5A5', '#FFC000',
     '#5B9BD5', '#70AD47', '#264478', '#9E480E'
@@ -217,55 +202,59 @@ color_map = {a: cores_powerbi[i % len(cores_powerbi)] for i, a in enumerate(area
 
 fig = go.Figure()
 
+# =========================
+# DESENHO DAS BARRAS (SCATTER)
+# =========================
 for area, df_area in df_gantt.groupby('PROG.', sort=False):
     cor = color_map.get(area, '#999999')
 
-    if mostrar_concluido:
-        fig.add_bar(
-            x=df_area['DUR_CONCLUIDA'],
-            y=df_area['Y_LABEL'],
-            base=df_area['DT INICIO'],
-            orientation='h',
-            marker=dict(color=cor),
-            showlegend=False
-        )
+    for _, row in df_area.iterrows():
+        y = row['Y_LABEL']
+        inicio = row['DT INICIO']
+        fim = row['DT FIM']
 
-        fig.add_bar(
-            x=df_area['DUR_RESTANTE'],
-            y=df_area['Y_LABEL'],
-            base=df_area['DT INICIO'] + pd.to_timedelta(df_area['DUR_CONCLUIDA'], unit='D'),
-            orientation='h',
-            marker=dict(color=cor, opacity=0.35),
-            showlegend=False
-        )
-    else:
-        fig.add_bar(
-            x=df_area['DURACAO'],
-            y=df_area['Y_LABEL'],
-            base=df_area['DT INICIO'],
-            orientation='h',
-            marker=dict(color=cor),
-            showlegend=False
-        )
+        dur_total = max((fim - inicio).days, 1)
 
+        if mostrar_concluido and row['% CONCLUÍDO'] > 0:
+            dur_conc = round(dur_total * row['% CONCLUÍDO'] / 100)
+            dt_parcial = inicio + pd.Timedelta(days=dur_conc)
+
+            # Parte concluída
+            fig.add_trace(go.Scatter(
+                x=[inicio, dt_parcial],
+                y=[y, y],
+                mode='lines',
+                line=dict(color=cor, width=18),
+                showlegend=False,
+                hovertemplate=(
+                    f"<b>{y}</b><br>"
+                    f"Área: {area}<br>"
+                    f"Concluído: {row['% CONCLUÍDO']:.0f}%<extra></extra>"
+                )
+            ))
+
+            # Parte restante
+            if row['% CONCLUÍDO'] < 100:
+                fig.add_trace(go.Scatter(
+                    x=[dt_parcial, fim],
+                    y=[y, y],
+                    mode='lines',
+                    line=dict(color=cor, width=18, dash='dot'),
+                    opacity=0.4,
+                    showlegend=False
+                ))
+        else:
+            # Barra inteira
+            fig.add_trace(go.Scatter(
+                x=[inicio, fim],
+                y=[y, y],
+                mode='lines',
+                line=dict(color=cor, width=18),
+                showlegend=False
+            ))
+
+# Linha HOJE
 hoje = pd.Timestamp.today().normalize()
-
-fig.update_layout(
-    barmode='stack',
-    xaxis=dict(
-        type='date',
-        side='top',
-        tickformat='%d/%m',
-        showgrid=True
-    ),
-    yaxis=dict(
-        autorange='reversed'
-    ),
-    height=max(500, len(df_gantt) * 28),
-    margin=dict(l=420, r=120, t=50, b=20),
-    plot_bgcolor='white',
-    showlegend=False
-)
 
 fig.add_shape(
     type="line",
@@ -287,6 +276,24 @@ fig.add_annotation(
     borderwidth=1
 )
 
+# Layout
+fig.update_layout(
+    xaxis=dict(
+        type='date',
+        side='top',
+        tickformat='%d/%m',
+        showgrid=True
+    ),
+    yaxis=dict(
+        type='category',
+        autorange='reversed'
+    ),
+    height=max(500, len(df_gantt) * 30),
+    margin=dict(l=420, r=120, t=50, b=20),
+    plot_bgcolor='white',
+    showlegend=False
+)
+
 st.plotly_chart(
     fig,
     use_container_width=True,
@@ -298,3 +305,4 @@ st.plotly_chart(
 )
 
 st.caption("⚡ Gantt otimizado | Desenvolvido para Controle de Programação da Oficina")
+
